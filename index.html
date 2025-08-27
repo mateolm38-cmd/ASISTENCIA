@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Asistencia</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #e2e8f0;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 20px;
+        }
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #4a5568;
+        }
+        input[type="text"], input[type="date"], textarea {
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, input[type="date"]:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        textarea {
+            resize: vertical;
+        }
+        #signature-pad-container {
+            border: 2px solid #cbd5e0;
+            border-radius: 8px;
+            background: #f7fafc;
+            margin-top: 5px;
+            position: relative;
+            width: 100%;
+            height: 200px; /* Default height */
+        }
+        #signature-pad {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button.primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        button.primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-2px);
+        }
+        button.secondary {
+            background-color: #ef4444;
+            color: white;
+        }
+        button.secondary:hover {
+            background-color: #dc2626;
+            transform: translateY(-2px);
+        }
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            text-align: center;
+        }
+        .message-box button {
+            margin-top: 10px;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 5px;
+            padding: 8px 16px;
+        }
+        .table-section {
+            margin-top: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        thead th {
+            background-color: #4a5568;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+        tbody td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .export-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .signature-img {
+            max-width: 100px;
+            height: auto;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+        }
+        .flex-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .flex-row .form-group {
+            flex: 1;
+        }
+        .flex-row .form-group.small {
+            flex: 0.5;
+        }
+        .flex-row .form-group.large {
+            flex: 2;
+        }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Registro de Asistencia de Mateo Lopez Mora</h1>
+        <form id="attendance-form" class="form-section">
+            <div class="form-group">
+                <label for="signer-name">Nombre del encargado de firmar:</label>
+                <input type="text" id="signer-name" name="signer-name" required>
+            </div>
+            <div class="form-group">
+                <label for="supervised-name">Nombre del encargado de las actividades:</label>
+                <input type="text" id="supervised-name" value="Mateo Lopez Mora" readonly class="bg-gray-100 cursor-not-allowed">
+            </div>
+            <div class="form-group">
+                <label for="date">Fecha:</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Descripción de las actividades:</label>
+                <textarea id="description" name="description" rows="4" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Firma:</label>
+                <div id="signature-pad-container">
+                    <canvas id="signature-pad"></canvas>
+                </div>
+            </div>
+            <div class="button-container">
+                <button type="button" id="clear-signature" class="secondary">Limpiar Firma</button>
+                <button type="submit" class="primary">Guardar Asistencia</button>
+            </div>
+        </form>
+
+        <hr class="my-8 border-t-2 border-gray-200">
+
+        <div class="table-section">
+            <h2>Previsualización de Asistencias</h2>
+            <table id="attendance-table">
+                <thead>
+                    <tr>
+                        <th>Encargado de Firmar</th>
+                        <th>Encargado de Actividades</th>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th>Firma</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Attendance records will be dynamically added here -->
+                </tbody>
+            </table>
+
+            <div class="export-buttons">
+                <button id="export-pdf" class="primary">Exportar a PDF</button>
+                <button id="export-excel" class="primary">Exportar a Excel (CSV)</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="message-box" class="message-box">
+        <p id="message-text"></p>
+        <button id="close-message-box">Cerrar</button>
+    </div>
+
+    <script>
+        // Main application logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('attendance-form');
+            const tableBody = document.querySelector('#attendance-table tbody');
+            const clearSignatureBtn = document.getElementById('clear-signature');
+            const exportPdfBtn = document.getElementById('export-pdf');
+            const exportExcelBtn = document.getElementById('export-excel');
+            const signaturePadCanvas = document.getElementById('signature-pad');
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+            const closeMessageBoxBtn = document.getElementById('close-message-box');
+
+            let signaturePad = null;
+            
+            // Function to resize canvas
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                signaturePadCanvas.width = signaturePadCanvas.offsetWidth * ratio;
+                signaturePadCanvas.height = signaturePadCanvas.offsetHeight * ratio;
+                signaturePadCanvas.getContext("2d").scale(ratio, ratio);
+                signaturePad = new SignaturePad(signaturePadCanvas);
+                loadData();
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Function to show custom alert message
+            function showMessage(message) {
+                messageText.textContent = message;
+                messageBox.style.display = 'block';
+            }
+
+            closeMessageBoxBtn.addEventListener('click', () => {
+                messageBox.style.display = 'none';
+            });
+
+            // Load data when the page loads
+            loadData();
+
+            // Clear the signature pad
+            clearSignatureBtn.addEventListener('click', () => {
+                signaturePad.clear();
+            });
+
+            // Handle form submission
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                if (signaturePad.isEmpty()) {
+                    showMessage("Por favor, firme en el recuadro.");
+                    return;
+                }
+
+                const newAttendance = {
+                    signerName: document.getElementById('signer-name').value,
+                    supervisedName: document.getElementById('supervised-name').value,
+                    date: document.getElementById('date').value,
+                    description: document.getElementById('description').value,
+                    signature: signaturePad.toDataURL()
+                };
+
+                saveData(newAttendance);
+                displayData(newAttendance);
+                
+                // Reset form and signature pad
+                form.reset();
+                signaturePad.clear();
+            });
+
+            // Function to save data to localStorage
+            function saveData(data) {
+                const attendances = JSON.parse(localStorage.getItem('attendances')) || [];
+                attendances.push(data);
+                localStorage.setItem('attendances', JSON.stringify(attendances));
+            }
+
+            // Function to load data from localStorage
+            function loadData() {
+                const attendances = JSON.parse(localStorage.getItem('attendances')) || [];
+                // Clear existing data to prevent duplicates on resize
+                tableBody.innerHTML = '';
+                // Sort by date in descending order
+                attendances.sort((a, b) => new Date(b.date) - new Date(a.date));
+                attendances.forEach(attendance => displayData(attendance, false));
+            }
+
+            // Function to display data in the table
+            function displayData(data) {
+                const row = tableBody.insertRow(0); // Add to the top of the table
+                row.innerHTML = `
+                    <td>${data.signerName}</td>
+                    <td>${data.supervisedName}</td>
+                    <td>${data.date}</td>
+                    <td>${data.description}</td>
+                    <td><img src="${data.signature}" alt="Firma" class="signature-img"></td>
+                `;
+            }
+
+            // Export to PDF
+            exportPdfBtn.addEventListener('click', () => {
+                const attendances = JSON.parse(localStorage.getItem('attendances')) || [];
+                if (attendances.length === 0) {
+                    showMessage('No hay datos para exportar.');
+                    return;
+                }
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Add header content similar to the image
+                doc.setFontSize(14);
+                doc.text("FORMATO DE REGISTRO DE ACTIVIDADES DEL CONTRATISTA", 105, 15, null, null, "center");
+                doc.line(10, 18, 200, 18); // Horizontal line
+
+                doc.setFontSize(10);
+                doc.text("MUNICIPIO/DTO:", 10, 25);
+                doc.text("YACUANQUER NARIÑO", 50, 25);
+                doc.text("EMPRESA:", 110, 25);
+                doc.text("ESE SALUDYA", 140, 25);
+                
+                doc.text("RESPONSABLE:", 10, 32);
+                doc.text("WILSON MATEO LOPEZ MORA", 45, 32);
+                doc.text("IDENTIFICACIÓN No.", 110, 32);
+                doc.text("1127080365", 155, 32);
+
+                doc.setFillColor(198, 246, 213); // Light green background
+                doc.rect(10, 35, 190, 8, 'F'); // Green bar
+
+                const tableData = attendances.map(item => [
+                    item.date,
+                    item.signerName,
+                    {
+                        content: '',
+                        styles: { cellHeight: 20 },
+                    },
+                    item.description
+                ]);
+                
+                const tableOptions = {
+                    startY: 50,
+                    head: [['FECHA', 'NOMBRE/APELLIDO (ENCARGADO DE FIRMAR)', 'FIRMA', 'OBSERVACIÓN']],
+                    body: tableData,
+                    styles: {
+                        cellPadding: 2,
+                        fontSize: 8,
+                        valign: 'middle',
+                        halign: 'center',
+                    },
+                    headStyles: {
+                        fillColor: [198, 246, 213],
+                        textColor: [0, 0, 0]
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 20 },
+                        1: { cellWidth: 70 },
+                        2: { cellWidth: 40 },
+                        3: { cellWidth: 'auto' }
+                    }
+                };
+                
+                // Generar la tabla primero
+                doc.autoTable(tableOptions);
+                
+                // Añadir las firmas manualmente
+                const rows = doc.autoTable.previous.body;
+                rows.forEach((row, index) => {
+                    const signature = attendances[index].signature;
+                    const x = row.cells[2].x + row.cells[2].width / 2;
+                    const y = row.cells[2].y + row.cells[2].height / 2;
+                    doc.addImage(signature, 'PNG', x - 15, y - 7.5, 30, 15);
+                });
+
+                doc.save('asistencia.pdf');
+            });
+
+            // Export to Excel (CSV)
+            exportExcelBtn.addEventListener('click', () => {
+                const attendances = JSON.parse(localStorage.getItem('attendances')) || [];
+                if (attendances.length === 0) {
+                    showMessage('No hay datos para exportar.');
+                    return;
+                }
+
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "FECHA,ENCARGADO DE FIRMAR,FIRMA (DATA URL),DESCRIPCIÓN DE ACTIVIDADES\r\n";
+                
+                attendances.forEach(item => {
+                    let row = [
+                        `"${item.date}"`,
+                        `"${item.signerName.replace(/"/g, '""')}"`,
+                        `"${item.signature.replace(/"/g, '""')}"`,
+                        `"${item.description.replace(/"/g, '""')}"`
+                    ].join(",");
+                    csvContent += row + "\r\n";
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "asistencia.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        });
+    </script>
+</body>
+</html>
