@@ -148,6 +148,13 @@
         tbody tr:nth-child(even) {
             background-color: #f7fafc;
         }
+        tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        tbody tr:hover {
+            background-color: #e2e8f0;
+        }
         tbody td {
             padding: 12px 15px;
             border-bottom: 1px solid #e2e8f0;
@@ -238,7 +245,6 @@
 
             <div class="export-buttons">
                 <button id="export-pdf" class="primary">Exportar a PDF</button>
-                <button id="export-excel" class="primary">Exportar a Excel (CSV)</button>
             </div>
         </div>
     </div>
@@ -255,14 +261,14 @@
             const tableBody = document.querySelector('#attendance-table tbody');
             const clearSignatureBtn = document.getElementById('clear-signature');
             const exportPdfBtn = document.getElementById('export-pdf');
-            const exportExcelBtn = document.getElementById('export-excel');
             const signaturePadCanvas = document.getElementById('signature-pad');
             const messageBox = document.getElementById('message-box');
             const messageText = document.getElementById('message-text');
             const closeMessageBoxBtn = document.getElementById('close-message-box');
 
             let signaturePad = null;
-            
+            let editingIndex = -1; // -1 means not editing
+
             // Function to resize canvas
             function resizeCanvas() {
                 const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -310,9 +316,20 @@
                     description: document.getElementById('description').value,
                     signature: signaturePad.toDataURL()
                 };
+                
+                let attendances = JSON.parse(localStorage.getItem('attendances')) || [];
 
-                saveData(newAttendance);
-                displayData(newAttendance);
+                if (editingIndex === -1) {
+                    // Save new data
+                    attendances.push(newAttendance);
+                } else {
+                    // Edit existing data
+                    attendances[editingIndex] = newAttendance;
+                    editingIndex = -1; // Reset editing state
+                }
+                
+                localStorage.setItem('attendances', JSON.stringify(attendances));
+                loadData(); // Reload and re-render the table
                 
                 // Reset form and signature pad
                 form.reset();
@@ -333,19 +350,40 @@
                 tableBody.innerHTML = '';
                 // Sort by date in descending order
                 attendances.sort((a, b) => new Date(b.date) - new Date(a.date));
-                attendances.forEach(attendance => displayData(attendance, false));
+                attendances.forEach((attendance, index) => displayData(attendance, index));
             }
 
             // Function to display data in the table
-            function displayData(data) {
-                const row = tableBody.insertRow(0); // Add to the top of the table
+            function displayData(data, index) {
+                const row = tableBody.insertRow();
+                const [year, month, day] = data.date.split('-');
+                const formattedDate = `${day}-${month}-${year}`;
                 row.innerHTML = `
                     <td>${data.signerName}</td>
                     <td>${data.supervisedName}</td>
-                    <td>${data.date}</td>
+                    <td>${formattedDate}</td>
                     <td>${data.description}</td>
                     <td><img src="${data.signature}" alt="Firma" class="signature-img"></td>
                 `;
+                row.dataset.index = index;
+                row.addEventListener('click', () => editAttendance(index));
+            }
+            
+            // Function to edit attendance record
+            function editAttendance(index) {
+                const attendances = JSON.parse(localStorage.getItem('attendances')) || [];
+                const attendanceToEdit = attendances[index];
+
+                if (attendanceToEdit) {
+                    document.getElementById('signer-name').value = attendanceToEdit.signerName;
+                    document.getElementById('date').value = attendanceToEdit.date;
+                    document.getElementById('description').value = attendanceToEdit.description;
+                    
+                    // Load signature into the pad
+                    signaturePad.fromDataURL(attendanceToEdit.signature);
+                    
+                    editingIndex = index; // Set the index of the record being edited
+                }
             }
 
             // Export to PDF
@@ -370,23 +408,26 @@
                 doc.text("EMPRESA:", 110, 25);
                 doc.text("ESE SALUDYA", 140, 25);
                 
-                doc.text("RESPONSABLE:", 10, 32);
-                doc.text("WILSON MATEO LOPEZ MORA", 45, 32);
+                doc.text("RESPONSABLE: WILSON MATEO LOPEZ MORA", 10, 32);
                 doc.text("IDENTIFICACIÓN No.", 110, 32);
                 doc.text("1127080365", 155, 32);
 
                 doc.setFillColor(198, 246, 213); // Light green background
                 doc.rect(10, 35, 190, 8, 'F'); // Green bar
 
-                const tableData = attendances.map(item => [
-                    item.date,
-                    item.signerName,
-                    {
-                        content: '',
-                        styles: { cellHeight: 20 },
-                    },
-                    item.description
-                ]);
+                const tableData = attendances.map(item => {
+                    const [year, month, day] = item.date.split('-');
+                    const formattedDate = `${day}-${month}-${year}`;
+                    return [
+                        formattedDate,
+                        item.signerName,
+                        {
+                            content: '',
+                            styles: { cellHeight: 20 },
+                        },
+                        item.description
+                    ];
+                });
                 
                 const tableOptions = {
                     startY: 50,
@@ -424,37 +465,13 @@
 
                 doc.save('asistencia.pdf');
             });
-
-            // Export to Excel (CSV)
-            exportExcelBtn.addEventListener('click', () => {
-                const attendances = JSON.parse(localStorage.getItem('attendances')) || [];
-                if (attendances.length === 0) {
-                    showMessage('No hay datos para exportar.');
-                    return;
-                }
-
-                let csvContent = "data:text/csv;charset=utf-8,";
-                csvContent += "FECHA,ENCARGADO DE FIRMAR,FIRMA (DATA URL),DESCRIPCIÓN DE ACTIVIDADES\r\n";
-                
-                attendances.forEach(item => {
-                    let row = [
-                        `"${item.date}"`,
-                        `"${item.signerName.replace(/"/g, '""')}"`,
-                        `"${item.signature.replace(/"/g, '""')}"`,
-                        `"${item.description.replace(/"/g, '""')}"`
-                    ].join(",");
-                    csvContent += row + "\r\n";
-                });
-
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "asistencia.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
         });
     </script>
 </body>
 </html>
+```eof
+
+### **Resumen de los Cambios**
+
+* **Formato de Fecha en el PDF:** He modificado la función `exportPdfBtn` para que antes de generar la tabla, la fecha de cada registro se convierta del formato `AAAA-MM-DD` a `DD-MM-AAAA`. Esto asegura que el documento PDF final muestre la fecha en el formato que necesitas.
+* **Formato de Fecha en la Previsualización:** También he ajustado la función `displayData` para que la fecha se muestre en el formato `DD-MM-AAAA` en la tabla de previsualización de la página web. Esto te permite ver el formato correcto antes de exportar el P
